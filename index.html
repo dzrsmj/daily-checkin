@@ -221,6 +221,15 @@ var _hmt = _hmt || [];
   .dialog p { margin-bottom: 16px; font-size: 0.95rem; line-height: 1.5; }
   .dialog .btns { display: flex; gap: 10px; }
   .dialog .btns .btn { flex: 1; }
+  .share-dialog {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    max-width: 340px;
+    width: 90%;
+    text-align: center;
+  }
 
   .footer {
     text-align: center;
@@ -288,6 +297,14 @@ var _hmt = _hmt || [];
       <button class="btn" onclick="closeOverlay()">取消</button>
       <button class="btn danger" onclick="doReset()">确定</button>
     </div>
+  </div>
+</div>
+
+<div class="overlay" id="shareOverlay" onclick="closeShare()">
+  <div class="share-dialog" onclick="event.stopPropagation()">
+    <p style="margin-bottom:12px;font-size:0.9rem;">长按图片保存到相册</p>
+    <img id="shareImage" src="" style="width:100%;border-radius:10px;">
+    <button class="btn" style="margin-top:12px;width:100%;" onclick="closeShare()">关闭</button>
   </div>
 </div>
 
@@ -452,6 +469,8 @@ document.getElementById('goalText').addEventListener('click', () => {
   }
 });
 
+const isWechat = /MicroMessenger/i.test(navigator.userAgent);
+
 function captureShare() {
   const btn = document.getElementById('shareBtn');
   btn.textContent = '⏳ 生成中...';
@@ -461,17 +480,28 @@ function captureShare() {
     scale: 2,
     useCORS: true
   }).then(canvas => {
-    // Download
-    const link = document.createElement('a');
-    link.download = '30天打卡.png';
-    link.href = canvas.toDataURL('image/png');
-    link.click();
+    const url = canvas.toDataURL('image/png');
+    if (isWechat) {
+      // WeChat: show overlay for long-press save
+      document.getElementById('shareImage').src = url;
+      document.getElementById('shareOverlay').classList.add('show');
+    } else {
+      // Browser: download directly
+      const link = document.createElement('a');
+      link.download = '30天打卡.png';
+      link.href = url;
+      link.click();
+      showToast('✅ 图片已保存');
+    }
     btn.textContent = '📤 生成分享图';
-    showToast('✅ 图片已保存');
   }).catch(() => {
     btn.textContent = '📤 生成分享图';
     showToast('生成失败，请重试');
   });
+}
+
+function closeShare() {
+  document.getElementById('shareOverlay').classList.remove('show');
 }
 
 function confirmReset() {
