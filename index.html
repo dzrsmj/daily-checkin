@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>30天打卡</title>
+<script>
+var _hmt = _hmt || [];
+(function() {
+  var hm = document.createElement("script");
+  hm.src = "https://hm.baidu.com/hm.js?d45922a4f146749aa40606104912ac36";
+  var s = document.getElementsByTagName("script")[0];
+  s.parentNode.insertBefore(hm, s);
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --card: #1a1a1a;
+    --text: #e0e0e0;
+    --sub: #888;
+    --border: #2a2a2a;
+    --accent: #f0b90b;
+    --accent-dim: rgba(240,185,11,0.15);
+    --green: #4caf50;
+    --green-dim: rgba(76,175,80,0.15);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
+  .container { max-width: 400px; width: 100%; }
+
+  .header {
+    text-align: center;
+    margin: 20px 0 24px;
+  }
+  .header .goal {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 4px;
+  }
+  .header .sub { color: var(--sub); font-size: 0.8rem; }
+
+  /* Captured area */
+  .capture-area { padding: 20px 20px 24px 20px; }
+
+  /* Stats */
+  .stats {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .stat-card {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 10px;
+    text-align: center;
+  }
+  .stat-card .value { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+  .stat-card .label { font-size: 0.7rem; color: var(--sub); margin-top: 2px; }
+
+  /* Progress */
+  .progress-wrap { margin-bottom: 20px; }
+  .progress-bar {
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+    overflow: hidden;
+    margin-bottom: 6px;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--accent);
+    border-radius: 3px;
+    transition: width 0.3s;
+  }
+  .progress-label { font-size: 0.75rem; color: var(--sub); text-align: right; }
+  .debug-ctrl {
+    font-size: 0.7rem;
+    color: #e74c3c;
+    cursor: pointer;
+    border: 1px dashed #e74c3c;
+    padding: 2px 8px;
+    border-radius: 10px;
+  }
+
+  /* Grid */
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .day {
+    aspect-ratio: 1;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .day:active { transform: scale(0.95); }
+  .day .num { font-size: 0.7rem; color: var(--sub); }
+  .day.checked {
+    background: var(--green-dim);
+    border-color: var(--green);
+  }
+  .day.checked .num { color: var(--green); }
+  .day.checked::after {
+    content: '✓';
+    font-size: 0.9rem;
+    color: var(--green);
+    font-weight: 700;
+  }
+  .day.today { border-color: var(--accent); }
+
+  /* Actions (not captured) */
+  .actions {
+    display: flex;
+    gap: 10px;
+    margin: 20px 0;
+  }
+  .btn {
+    flex: 1;
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-size: 0.9rem;
+    cursor: pointer;
+    text-align: center;
+    text-decoration: none;
+    transition: all 0.15s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn.accent {
+    background: var(--accent);
+    color: #000;
+    border-color: var(--accent);
+    font-weight: 600;
+  }
+  .btn.danger { color: #e74c3c; }
+
+  /* Goal input */
+  .goal-input-wrap {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .goal-input-wrap input {
+    flex: 1;
+    padding: 10px 14px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    font-size: 0.9rem;
+    outline: none;
+  }
+  .goal-input-wrap input:focus { border-color: var(--accent); }
+  .goal-input-wrap input::placeholder { color: var(--sub); }
+  .goal-input-wrap .btn { flex: 0 0 auto; padding: 10px 16px; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--card);
+    border: 1px solid var(--border);
+    padding: 10px 24px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    z-index: 999;
+    animation: toastIn 0.3s, toastOut 0.3s 1.7s forwards;
+    pointer-events: none;
+  }
+  @keyframes toastIn { from { opacity: 0; top: 0; } to { opacity: 1; top: 20px; } }
+  @keyframes toastOut { from { opacity: 1; } to { opacity: 0; } }
+
+  /* Overlay */
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .overlay.show { display: flex; }
+  .dialog {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 24px;
+    text-align: center;
+    max-width: 300px;
+    margin: 20px;
+  }
+  .dialog p { margin-bottom: 16px; font-size: 0.95rem; line-height: 1.5; }
+  .dialog .btns { display: flex; gap: 10px; }
+  .dialog .btns .btn { flex: 1; }
+
+  .footer {
+    text-align: center;
+    color: var(--sub);
+    font-size: 0.7rem;
+    margin: 10px 0 30px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <div class="capture-area" id="captureArea">
+
+    <div class="header">
+      <div class="goal" id="goalText">📅 30天打卡</div>
+      <div class="sub" id="startDate">输入你的打卡目的，开始坚持</div>
+    </div>
+
+    <div class="goal-input-wrap" id="goalInput" style="display:none;">
+      <input type="text" id="goalField" placeholder="输入打卡目的，如：坚持阅读、跑步…" maxlength="12" autocomplete="off">
+      <button class="btn accent" onclick="setGoal()">开始</button>
+    </div>
+
+    <div class="stats">
+      <div class="stat-card">
+        <div class="value" id="doneCount">0</div>
+        <div class="label">已完成</div>
+      </div>
+      <div class="stat-card">
+        <div class="value" id="streakCount">0</div>
+        <div class="label">连续天</div>
+      </div>
+      <div class="stat-card">
+        <div class="value" id="remainCount">30</div>
+        <div class="label">剩余</div>
+      </div>
+    </div>
+
+    <div class="progress-wrap">
+      <div class="progress-bar"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <span class="debug-ctrl" id="debugCtrl" style="display:none;">⏭ 跳过一天</span>
+        <span class="progress-label" id="progressLabel">0/30</span>
+      </div>
+    </div>
+
+    <div class="grid" id="grid"></div>
+
+  </div>
+
+  <div class="actions">
+    <button class="btn accent" id="shareBtn" onclick="captureShare()">📤 生成分享图</button>
+    <button class="btn danger" onclick="confirmReset()">🔄 重新开始</button>
+  </div>
+
+  <div class="footer">Built with AI</div>
+
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="dialog">
+    <p>确定要重新开始吗？<br>当前的打卡记录将被清除。</p>
+    <div class="btns">
+      <button class="btn" onclick="closeOverlay()">取消</button>
+      <button class="btn danger" onclick="doReset()">确定</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'checkin_30days';
+const TOTAL = 30;
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return { goal: '', checks: [], startDate: null };
+}
+
+function save(data) {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+}
+
+function getTodayIndex(data) {
+  if (!data.startDate) return -1;
+  const start = new Date(data.startDate);
+  const now = new Date();
+  const localNow = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const localStart = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const diff = Math.floor((localNow - localStart) / (1000 * 60 * 60 * 24)) + debugOffset;
+  if (diff < 0 || diff >= TOTAL) return -1;
+  return diff;
+}
+
+function setGoal() {
+  const val = document.getElementById('goalField').value.trim();
+  if (!val) return showToast('请输入打卡目的');
+  const data = load();
+  data.goal = val;
+  if (!data.startDate) {
+    const now = new Date();
+    data.startDate = now.getFullYear() + '-' +
+      String(now.getMonth() + 1).padStart(2, '0') + '-' +
+      String(now.getDate()).padStart(2, '0');
+  }
+  // Auto-check day 1
+  while (data.checks.length < TOTAL) data.checks.push(false);
+  data.checks[0] = true;
+  save(data);
+  render();
+  showToast('🚀 ' + val + ' · 第1天，开始！');
+}
+
+function toggleDay(idx) {
+  const data = load();
+  while (data.checks.length < TOTAL) data.checks.push(false);
+
+  // Only allow toggling today's slot
+  const todayIdx = getTodayIndex(data);
+  if (idx !== todayIdx) return;
+
+  data.checks[idx] = !data.checks[idx];
+  save(data);
+  render();
+  if (data.checks[idx]) showToast('✅ ' + data.goal + ' 第 ' + (idx + 1) + ' 天打卡成功！');
+  else showToast('已取消今日打卡');
+}
+
+function render() {
+  const data = load();
+  const hasGoal = !!data.goal;
+  const todayIdx = getTodayIndex(data);
+  const doneCount = data.checks.filter(Boolean).length;
+  const remainCount = TOTAL - doneCount;
+
+  // Goal display
+  const title = data.goal ? '📅 ' + data.goal + '·30天打卡' : '📅 30天打卡';
+  document.getElementById('goalText').textContent = title;
+  document.getElementById('goalText').style.cursor = 'pointer';
+  document.getElementById('goalText').title = '点击修改目标';
+
+  // Show/hide goal input
+  const inputWrap = document.getElementById('goalInput');
+  if (hasGoal) {
+    inputWrap.style.display = 'none';
+  }
+
+  // Grid
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  for (let i = 0; i < TOTAL; i++) {
+    const d = document.createElement('div');
+    d.className = 'day';
+    if (data.checks[i]) d.classList.add('checked');
+    if (i === todayIdx) d.classList.add('today');
+
+    const isPast = i < todayIdx;
+    const isFuture = i > todayIdx;
+    const canClick = hasGoal && (DEBUG || i === todayIdx);
+
+    d.innerHTML = '<span class="num">' + (i + 1) + '</span>';
+
+    if (!hasGoal) {
+      d.style.opacity = '0.35';
+      d.style.cursor = 'default';
+      d.onclick = () => showToast('请先输入打卡目的');
+    } else if (isPast) {
+      d.style.opacity = '0.7';
+      d.style.cursor = 'default';
+      d.onclick = () => showToast('已过去的打卡不能修改');
+    } else if (isFuture) {
+      d.style.opacity = '0.35';
+      d.style.cursor = 'default';
+      d.onclick = () => showToast('还没到这一天呢');
+    } else {
+      d.onclick = () => toggleDay(i);
+    }
+    grid.appendChild(d);
+  }
+
+  // Stats
+  document.getElementById('doneCount').textContent = doneCount;
+  let streak = 0;
+  for (let i = todayIdx >= 0 ? todayIdx : TOTAL - 1; i >= 0; i--) {
+    if (data.checks[i]) streak++; else break;
+  }
+  document.getElementById('streakCount').textContent = streak;
+  document.getElementById('remainCount').textContent = remainCount;
+
+  // Progress
+  const pct = Math.round((doneCount / TOTAL) * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressLabel').textContent = doneCount + '/' + TOTAL;
+
+  // Start date
+  if (data.startDate) {
+    document.getElementById('startDate').textContent =
+      '从 ' + data.startDate + ' 开始，已坚持 ' + doneCount + ' 天';
+  } else {
+    document.getElementById('startDate').textContent = '点击格子开始你的第一天';
+  }
+
+  // Share btn
+  const shareBtn = document.getElementById('shareBtn');
+  if (hasGoal && doneCount > 0) {
+    shareBtn.style.opacity = '1';
+    shareBtn.style.pointerEvents = 'auto';
+  } else {
+    shareBtn.style.opacity = '0.5';
+    shareBtn.style.pointerEvents = 'none';
+  }
+  if (doneCount >= TOTAL) shareBtn.textContent = '🎉 生成完结海报';
+  else shareBtn.textContent = '📤 生成分享图';
+}
+
+// Goal click to edit
+document.getElementById('goalText').addEventListener('click', () => {
+  const data = load();
+  const inputWrap = document.getElementById('goalInput');
+  if (inputWrap.style.display === 'none') {
+    inputWrap.style.display = 'flex';
+    document.getElementById('goalField').value = data.goal || '';
+    document.getElementById('goalField').focus();
+  } else {
+    inputWrap.style.display = 'none';
+  }
+});
+
+function captureShare() {
+  const btn = document.getElementById('shareBtn');
+  btn.textContent = '⏳ 生成中...';
+  const el = document.getElementById('captureArea');
+  html2canvas(el, {
+    backgroundColor: '#0f0f0f',
+    scale: 2,
+    useCORS: true
+  }).then(canvas => {
+    // Download
+    const link = document.createElement('a');
+    link.download = '30天打卡.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    btn.textContent = '📤 生成分享图';
+    showToast('✅ 图片已保存');
+  }).catch(() => {
+    btn.textContent = '📤 生成分享图';
+    showToast('生成失败，请重试');
+  });
+}
+
+function confirmReset() {
+  document.getElementById('overlay').classList.add('show');
+}
+function closeOverlay() {
+  document.getElementById('overlay').classList.remove('show');
+}
+function doReset() {
+  localStorage.removeItem(STORAGE_KEY);
+  closeOverlay();
+  render();
+  // Show goal input again
+  const data = load();
+  if (!data.goal) {
+    document.getElementById('goalInput').style.display = 'flex';
+    document.getElementById('goalField').value = '';
+    document.getElementById('goalField').focus();
+  }
+  showToast('已重新开始，加油！');
+}
+
+function showToast(msg) {
+  const t = document.createElement('div');
+  t.className = 'toast';
+  t.textContent = msg;
+  document.body.appendChild(t);
+  t.addEventListener('animationend', (e) => {
+    if (e.animationName === 'toastOut') t.remove();
+  });
+}
+
+// Debug mode: add ?debug to URL to unlock all cells + simulate day advance
+const DEBUG = window.location.search.includes('debug');
+let debugOffset = 0; // simulated extra days
+
+// Init
+(function init() {
+  if (DEBUG) {
+    document.getElementById('debugCtrl').style.display = 'inline-block';
+    document.getElementById('debugCtrl').addEventListener('click', () => {
+      debugOffset++;
+      render();
+      showToast('⏭ 模拟第 ' + (getTodayIndex(load()) + 1) + ' 天');
+    });
+    // Also reset offset if > 30
+  }
+  const data = load();
+  if (!data.goal) {
+    document.getElementById('goalInput').style.display = 'flex';
+    document.getElementById('goalField').focus();
+  }
+  render();
+})();
+</script>
+</body>
+</html>
